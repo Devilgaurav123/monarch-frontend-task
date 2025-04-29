@@ -1,0 +1,229 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fullscreen Railway Panorama Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body, html {
+            height: 100%;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        
+        .panorama-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+        }
+        
+        #currentImage {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: opacity 0.8s ease;
+        }
+        
+        .title-overlay {
+            position: absolute;
+            top: 20px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            color: white;
+            font-size: 2rem;
+            text-shadow: 0 0 10px rgba(0,0,0,0.7);
+            z-index: 10;
+            padding: 10px;
+            background-color: rgba(0,0,0,0.3);
+        }
+        
+        .controls {
+            position: absolute;
+            bottom: 30px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            z-index: 10;
+        }
+        
+        .control-btn {
+            padding: 12px 30px;
+            font-size: 1rem;
+            cursor: pointer;
+            border: none;
+            border-radius: 30px;
+            background-color: rgba(52, 152, 219, 0.8);
+            color: white;
+            transition: all 0.3s;
+            min-width: 150px;
+            backdrop-filter: blur(5px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        
+        .control-btn:hover {
+            background-color: rgba(41, 128, 185, 0.9);
+            transform: translateY(-2px);
+        }
+        
+        .control-btn:disabled {
+            background-color: rgba(149, 165, 166, 0.6);
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        #autoRotateBtn.active {
+            background-color: rgba(231, 76, 60, 0.8);
+        }
+        
+        /* Loading indicator */
+        .loader {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 1.2rem;
+            display: none;
+            z-index: 5;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top: 4px solid white;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="panorama-container">
+        <div class="title-overlay">Railway Panorama Gallery</div>
+        
+        <div class="loader">
+            <div class="spinner"></div>
+            Loading...
+        </div>
+        
+        <img id="currentImage" src="{% static images.0 %}">
+        
+        <div class="controls">
+            <button id="prevBtn" class="control-btn">Previous</button>
+            <button id="autoRotateBtn" class="control-btn">Start Auto-View</button>
+            <button id="nextBtn" class="control-btn">Next</button>
+        </div>
+    </div>
+
+    <script>
+        const images = [
+            {% for image in images %}
+                "{% static image %}"{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ];
+        
+        const imageElement = document.getElementById('currentImage');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const autoRotateBtn = document.getElementById('autoRotateBtn');
+        const loader = document.querySelector('.loader');
+        
+        let currentIndex = 0;
+        let isRotating = false;
+        let rotationInterval;
+        const rotationSpeed = 2000; // 2 seconds per image
+        
+        function showLoader() {
+            loader.style.display = 'block';
+            imageElement.style.opacity = 0.3;
+        }
+        
+        function hideLoader() {
+            loader.style.display = 'none';
+            imageElement.style.opacity = 1;
+        }
+        
+        function updateImage() {
+            showLoader();
+            
+            // Preload next image
+            const nextImage = new Image();
+            nextImage.src = images[currentIndex];
+            
+            nextImage.onload = () => {
+                imageElement.src = images[currentIndex];
+                hideLoader();
+            };
+            
+            prevBtn.disabled = currentIndex === 0;
+            nextBtn.disabled = currentIndex === images.length - 1;
+        }
+        
+        function startRotation() {
+            if (isRotating) return;
+            
+            isRotating = true;
+            autoRotateBtn.classList.add('active');
+            autoRotateBtn.textContent = 'End Auto-View';
+            
+            rotationInterval = setInterval(() => {
+                currentIndex = (currentIndex + 1) % images.length;
+                updateImage();
+            }, rotationSpeed);
+        }
+        
+        function stopRotation() {
+            if (!isRotating) return;
+            
+            clearInterval(rotationInterval);
+            isRotating = false;
+            autoRotateBtn.classList.remove('active');
+            autoRotateBtn.textContent = 'Start Auto-View';
+        }
+        
+        prevBtn.addEventListener('click', () => {
+            if (isRotating) stopRotation();
+            currentIndex = Math.max(0, currentIndex - 1);
+            updateImage();
+        });
+        
+        nextBtn.addEventListener('click', () => {
+            if (isRotating) stopRotation();
+            currentIndex = Math.min(images.length - 1, currentIndex + 1);
+            updateImage();
+        });
+        
+        autoRotateBtn.addEventListener('click', () => {
+            isRotating ? stopRotation() : startRotation();
+        });
+        
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') prevBtn.click();
+            if (e.key === 'ArrowRight') nextBtn.click();
+            if (e.key === ' ') autoRotateBtn.click();
+        });
+        
+        // Initialize
+        updateImage();
+    </script>
+</body>
+</html>
